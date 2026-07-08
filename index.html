@@ -1,71 +1,71 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<meta charset="utf-8"/>
-	<title>우리 동네 지도</title>
-	<style>
-		/* 1. 브라우저 기본 여백을 완전히 없애고 높이를 100%로 꽉 채움 */
-		html, body {
-			margin: 0;
-			padding: 0;
-			width: 100%;
-			height: 100%;
-			overflow: hidden; /* 강제로 스크롤바를 숨겨서 깔끔하게 만듦 */
-		}
-		
-		/* 2. 지도 영역도 부모(body) 크기에 맞춰 100%로 설정 */
-		#map {
-			width: 100%;
-			height: 100%;
-		}
-	</style>
+    <meta charset="utf-8"/>
+    <title>우리 동네 지도</title>
+    <style>
+        /* 브라우저 기본 여백 제거 및 화면 꽉 차게 설정 */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+        
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+    </style>
 </head>
 <body>
-	<div id="map"></div>
-	
-	<script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=2d2930c97c0980d7282447eca433bfe8"></script>
-	
-	<script>
-		var container = document.getElementById('map');
-		var options = {
-			center: new kakao.maps.LatLng(36.101850934215, 128.338441097864),
-			level: 4 
-		};
+    <div id="map"></div>
+    
+    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=2d2930c97c0980d7282447eca433bfe8"></script>
+    
+    <script>
+        // 1. 지도 생성 (구미 중심 좌표)
+        var container = document.getElementById('map');
+        var options = {
+            center: new kakao.maps.LatLng(36.101850934215, 128.338441097864),
+            level: 4 
+        };
+        var map = new kakao.maps.Map(container, options);
 
-		var map = new kakao.maps.Map(container, options);
-		// 2. 같은 폴더에 있는 data.json 파일 가져오기
-		fetch('places.json')
-			.then(response => response.json())
-			.then(data => {
-				
-				// 3. 데이터 반복하며 마커 찍기
+        // 2. places.json 파일 가져오기
+        fetch('places.json')
+            .then(response => response.json())
+            .then(data => {
+                
+                // 3. 데이터 반복하며 마커 찍기
                 data.forEach(item => {
-					var imageSrc = 'image.png'; // 예: 만약 올린 파일이 toilet.png라면
-					var imageSize = new kakao.maps.Size(35, 35); // 이미지 크기 설정
-					var markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize);
-
-// 2. 마커 생성 코드 안에 'image' 옵션을 넣어줍니다.
-					var marker = new kakao.maps.Marker({
-    					position: markerPosition,
-   						image: markerImage, // 이 마커는 내가 위에서 설정한 이미지를 씁니다.
-  						map: map
-					});
                     
-                    // ★ '운영상태'가 '사용중지'인 곳은 패스
+                    // ① '운영상태'가 '사용중지'인 곳은 먼저 걸러내고 패스
                     if (item["운영상태"] === "사용중지") {
                         return; 
                     }
 
-                    // 위도, 경도 문자열을 숫자로 변환
+                    // ② 위도, 경도 문자열을 숫자로 변환
                     var lat = parseFloat(item["위도(EPSG4326)"]);
                     var lng = parseFloat(item["경도(EPSG4326)"]);
                     
-                    // 좌표 객체 생성
+                    // ③ 마커가 찍힐 좌표 객체 생성
                     var markerPosition = new kakao.maps.LatLng(lat, lng);
 
+                    // ④ 마커 이미지 설정 (대소문자 및 파일명 주의)
+                    var imageSrc = 'image.png'; 
+                    var imageSize = new kakao.maps.Size(35, 35); 
+                    var markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize);
 
+                    // ⑤ 좌표와 이미지가 모두 준비된 상태에서 마커 생성
+                    var marker = new kakao.maps.Marker({
+                        position: markerPosition,
+                        image: markerImage, 
+                        map: map
+                    });
 
-                    // 말풍선(인포윈도우) 내용 구성
+                    // ⑥ 말풍선(인포윈도우) 내용 구성
                     var iwContent = `
                         <div style="padding:10px; color:#333; font-size:12px; min-width:150px;">
                             <strong>${item["시설명"]}</strong><br>
@@ -77,18 +77,17 @@
                         content: iwContent
                     });
 
-                    // 마우스 이벤트 등록 (마우스 올리면 말풍선 뜸)
+                    // ⑦ 마우스 이벤트 등록 (올리면 열리고, 떼면 닫힘)
                     kakao.maps.event.addListener(marker, 'mouseover', function() {
                         infowindow.open(map, marker);
                     });
 
-                    // 마우스 떼면 말풍선 사라짐
                     kakao.maps.event.addListener(marker, 'mouseout', function() {
                         infowindow.close();
                     });
                 });
-			})
-			.catch(error => console.error('데이터 로드 실패:', error));
-	</script>
+            })
+            .catch(error => console.error('데이터 로드 실패:', error));
+    </script>
 </body>
 </html>

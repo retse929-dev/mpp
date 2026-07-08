@@ -28,11 +28,56 @@
 	<script>
 		var container = document.getElementById('map');
 		var options = {
-			center: new kakao.maps.LatLng(36.101850934215, 128.338441097864), // 시작 위치 (위도, 경도)
+			center: new kakao.maps.LatLng(36.101850934215, 128.338441097864),
 			level: 4 
 		};
 
 		var map = new kakao.maps.Map(container, options);
+		// 2. 같은 폴더에 있는 data.json 파일 가져오기
+		fetch('data.json')
+			.then(response => response.json())
+			.then(data => {
+				
+				// 3. 데이터 반복하며 마커 찍기
+				data.forEach(item => {
+					
+					// JSON의 "위도(EPSG4326)", "경도(EPSG4326)"는 문자열이므로 숫자로 변환(parseFloat)해 줍니다.
+					var lat = parseFloat(item["위도(EPSG4326)"]);
+					var lng = parseFloat(item["경도(EPSG4326)"]);
+					
+					// 좌표 만들기
+					var markerPosition = new kakao.maps.LatLng(lat, lng);
+
+					// 마커 생성
+					var marker = new kakao.maps.Marker({
+						position: markerPosition,
+						map: map
+					});
+
+					// 말풍선(인포윈도우) 내용 구성 - 시설명과 운영상태 표시
+					var iwContent = `
+						<div style="padding:10px; color:#333; font-size:12px; min-width:150px;">
+							<strong>${item["시설명"]}</strong><br>
+							<span style="color:gray;">상태: ${item["운영상태"]}</span><br>
+							<span style="font-size:11px; color:#666;">${item["도로명전체주소"]}</span>
+						</div>`;
+					
+					var infowindow = new kakao.maps.InfoWindow({
+						content: iwContent
+					});
+
+					// 마우스 올리면 뜨고, 떼면 닫히는 이벤트
+					kakao.maps.event.addListener(marker, 'mouseover', function() {
+						infowindow.open(map, marker);
+					});
+
+					kakao.maps.event.addListener(marker, 'mouseout', function() {
+						infowindow.close();
+					});
+				});
+			})
+			.catch(error => console.error('데이터 로드 실패:', error));
 	</script>
+</body>
 </body>
 </html>

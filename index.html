@@ -34,7 +34,7 @@
 
 		var map = new kakao.maps.Map(container, options);
 		// 2. 같은 폴더에 있는 data.json 파일 가져오기
-		fetch('data.json')
+		fetch('places.json')
 			.then(response => response.json())
 			.then(data => {
 				

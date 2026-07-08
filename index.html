@@ -40,6 +40,16 @@
 				
 				// 3. 데이터 반복하며 마커 찍기
                 data.forEach(item => {
+					var imageSrc = 'image.png'; // 예: 만약 올린 파일이 toilet.png라면
+					var imageSize = new kakao.maps.Size(35, 35); // 이미지 크기 설정
+					var markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize);
+
+// 2. 마커 생성 코드 안에 'image' 옵션을 넣어줍니다.
+					var marker = new kakao.maps.Marker({
+    					position: markerPosition,
+   						image: markerImage, // 이 마커는 내가 위에서 설정한 이미지를 씁니다.
+  						map: map
+					});
                     
                     // ★ '운영상태'가 '사용중지'인 곳은 패스
                     if (item["운영상태"] === "사용중지") {

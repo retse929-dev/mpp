@@ -39,42 +39,48 @@
 			.then(data => {
 				
 				// 3. 데이터 반복하며 마커 찍기
-				data.forEach(item => {
-					
-					// JSON의 "위도(EPSG4326)", "경도(EPSG4326)"는 문자열이므로 숫자로 변환(parseFloat)해 줍니다.
-					var lat = parseFloat(item["위도(EPSG4326)"]);
-					var lng = parseFloat(item["경도(EPSG4326)"]);
-					
-					// 좌표 만들기
-					var markerPosition = new kakao.maps.LatLng(lat, lng);
+                data.forEach(item => {
+                    
+                    // ★ '운영상태'가 '사용중지'인 곳은 패스
+                    if (item["운영상태"] === "사용중지") {
+                        return; 
+                    }
 
-					// 마커 생성
-					var marker = new kakao.maps.Marker({
-						position: markerPosition,
-						map: map
-					});
+                    // 위도, 경도 문자열을 숫자로 변환
+                    var lat = parseFloat(item["위도(EPSG4326)"]);
+                    var lng = parseFloat(item["경도(EPSG4326)"]);
+                    
+                    // 좌표 객체 생성
+                    var markerPosition = new kakao.maps.LatLng(lat, lng);
 
-					// 말풍선(인포윈도우) 내용 구성 - 시설명과 운영상태 표시
-					var iwContent = `
-						<div style="padding:10px; color:#333; font-size:12px; min-width:150px;">
-							<strong>${item["시설명"]}</strong><br>
-							<span style="color:gray;">상태: ${item["운영상태"]}</span><br>
-							<span style="font-size:11px; color:#666;">${item["도로명전체주소"]}</span>
-						</div>`;
-					
-					var infowindow = new kakao.maps.InfoWindow({
-						content: iwContent
-					});
+                    // 기본 마커 생성
+                    var marker = new kakao.maps.Marker({
+                        position: markerPosition,
+                        map: map
+                    });
 
-					// 마우스 올리면 뜨고, 떼면 닫히는 이벤트
-					kakao.maps.event.addListener(marker, 'mouseover', function() {
-						infowindow.open(map, marker);
-					});
+                    // 말풍선(인포윈도우) 내용 구성
+                    var iwContent = `
+                        <div style="padding:10px; color:#333; font-size:12px; min-width:150px;">
+                            <strong>${item["시설명"]}</strong><br>
+                            <span style="color:gray;">상태: ${item["운영상태"]}</span><br>
+                            <span style="font-size:11px; color:#666;">${item["도로명전체주소"]}</span>
+                        </div>`;
+                    
+                    var infowindow = new kakao.maps.InfoWindow({
+                        content: iwContent
+                    });
 
-					kakao.maps.event.addListener(marker, 'mouseout', function() {
-						infowindow.close();
-					});
-				});
+                    // 마우스 이벤트 등록 (마우스 올리면 말풍선 뜸)
+                    kakao.maps.event.addListener(marker, 'mouseover', function() {
+                        infowindow.open(map, marker);
+                    });
+
+                    // 마우스 떼면 말풍선 사라짐
+                    kakao.maps.event.addListener(marker, 'mouseout', function() {
+                        infowindow.close();
+                    });
+                });
 			})
 			.catch(error => console.error('데이터 로드 실패:', error));
 	</script>

@@ -1,93 +1,411 @@
 <!DOCTYPE html>
-<html>
+<html lang="ko">
 <head>
-    <meta charset="utf-8"/>
-    <title>우리 동네 대피소 지도</title>
-    <style>
-        /* 브라우저 기본 여백 제거 및 화면 꽉 차게 설정 */
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-        }
-        
-        #map {
-            width: 100%;
-            height: 100%;
-        }
-    </style>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+<title>우리 동네 대피소 지도</title>
+<style>
+  :root {
+    --ink: #0f1d3a;          /* 민방위 남색 */
+    --ink-soft: #35476b;
+    --signal: #ffd400;       /* 표지판 노랑 */
+    --paper: #ffffff;
+    --line: rgba(15, 29, 58, 0.12);
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo",
+                 "Malgun Gothic", system-ui, sans-serif;
+    color: var(--ink);
+  }
+
+  #map { width: 100%; height: 100%; }
+
+  /* 조작 패널: 지도 위에 떠 있는 카드 */
+  #panel {
+    position: absolute;
+    z-index: 10;
+    left: 16px;
+    top: 16px;
+    width: 300px;
+    max-width: calc(100% - 32px);
+    max-height: calc(100% - 32px);
+    display: flex;
+    flex-direction: column;
+    background: var(--paper);
+    border-radius: 14px;
+    box-shadow: 0 6px 24px rgba(15, 29, 58, 0.18);
+    overflow: hidden;
+  }
+
+  #findBtn {
+    appearance: none;
+    border: 0;
+    width: 100%;
+    padding: 15px 16px;
+    background: var(--ink);
+    color: var(--signal);
+    font: inherit;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  #findBtn:hover:not(:disabled) { background: #16294f; }
+  #findBtn:focus-visible { outline: 3px solid var(--signal); outline-offset: -3px; }
+  #findBtn:disabled { background: var(--ink-soft); cursor: progress; opacity: 0.85; }
+
+  #status {
+    padding: 10px 16px;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--ink-soft);
+    border-top: 1px solid var(--line);
+  }
+  #status:empty { display: none; }
+  #status.is-error { color: #b3261e; }
+
+  #result {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  #result li { border-top: 1px solid var(--line); }
+  #result button {
+    appearance: none;
+    border: 0;
+    background: none;
+    width: 100%;
+    padding: 12px 16px;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    display: flex;
+    gap: 12px;
+    align-items: baseline;
+  }
+  #result button:hover { background: #f3f5f9; }
+  #result button:focus-visible { outline: 3px solid var(--ink); outline-offset: -3px; }
+
+  .rank {
+    flex: none;
+    width: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--ink-soft);
+    font-variant-numeric: tabular-nums;
+  }
+  .body { flex: 1; min-width: 0; }
+  .name {
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.35;
+    word-break: keep-all;
+  }
+  .addr {
+    margin-top: 3px;
+    font-size: 12px;
+    color: var(--ink-soft);
+    line-height: 1.4;
+    word-break: keep-all;
+  }
+  .dist {
+    flex: none;
+    font-size: 13px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: var(--ink);
+  }
+  #result li:first-child .dist { color: #0a7d33; }
+
+  .iw {
+    padding: 10px 12px;
+    font-size: 12px;
+    line-height: 1.5;
+    color: #333;
+    min-width: 160px;
+    word-break: keep-all;
+  }
+  .iw strong { font-size: 13px; }
+  .iw .meta { color: #777; }
+  .iw .away { color: #0a7d33; font-weight: 700; }
+
+  @media (max-width: 480px) {
+    #panel { left: 10px; right: 10px; top: 10px; width: auto; }
+    #result { max-height: 40vh; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
 </head>
 <body>
-    <div id="map"></div>
-    
-    <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=2d2930c97c0980d7282447eca433bfe8"></script>
-    
-    <script>
-        // 1. 지도 생성 (구미 중심 좌표)
-        var container = document.getElementById('map');
-        var options = {
-            center: new kakao.maps.LatLng(36.101850934215, 128.338441097864),
-            level: 4 
+  <div id="map"></div>
+
+  <div id="panel">
+    <button id="findBtn" type="button" disabled>대피소 목록을 불러오는 중…</button>
+    <p id="status"></p>
+    <ul id="result"></ul>
+  </div>
+
+  <script type="text/javascript" src="//dapi.kakao.com/v2/maps/sdk.js?appkey=2d2930c97c0980d7282447eca433bfe8"></script>
+  <script>
+  // 1. 지도 생성 (구미 중심 좌표)
+  var container = document.getElementById('map');
+  var map = new kakao.maps.Map(container, {
+    center: new kakao.maps.LatLng(36.101850934215, 128.338441097864),
+    level: 4
+  });
+
+  var findBtn = document.getElementById('findBtn');
+  var statusEl = document.getElementById('status');
+  var resultEl = document.getElementById('result');
+
+  var shelters = [];              // 사용 가능한 대피소 목록
+  var infowindow = new kakao.maps.InfoWindow({ zIndex: 3 });  // 하나만 만들어 재사용
+  var myMarker = null;            // 현재 위치 마커
+  var myAccuracy = null;          // 위치 정확도 원
+  var routeLine = null;           // 현재 위치 → 가장 가까운 대피소 직선
+
+  var markerImage = new kakao.maps.MarkerImage('image.png', new kakao.maps.Size(35, 35));
+
+  // 2. places.json 파일 가져와 마커 찍기
+  fetch('places.json')
+    .then(function (response) { return response.json(); })
+    .then(function (data) {
+      data.forEach(function (item) {
+        // 운영상태가 '사용중지'인 곳은 제외
+        if (item["운영상태"] === "사용중지") return;
+
+        var lat = parseFloat(item["위도(EPSG4326)"]);
+        var lng = parseFloat(item["경도(EPSG4326)"]);
+        // 좌표가 비어 있거나 깨진 행은 건너뜀
+        if (!isFinite(lat) || !isFinite(lng)) return;
+
+        var position = new kakao.maps.LatLng(lat, lng);
+        var marker = new kakao.maps.Marker({ position: position, image: markerImage, map: map });
+
+        var shelter = {
+          name: item["시설명"] || '이름 없음',
+          status: item["운영상태"] || '정보 없음',
+          addr: item["도로명전체주소"] || item["소재지지번주소"] || '',
+          lat: lat,
+          lng: lng,
+          position: position,
+          marker: marker
         };
-        var map = new kakao.maps.Map(container, options);
+        shelters.push(shelter);
 
-        // 2. places.json 파일 가져오기
-        fetch('places.json')
-            .then(response => response.json())
-            .then(data => {
-                
-                // 3. 데이터 반복하며 마커 찍기
-                data.forEach(item => {
-                    
-                    // ① '운영상태'가 '사용중지'인 곳은 먼저 걸러내고 패스
-                    if (item["운영상태"] === "사용중지") {
-                        return; 
-                    }
+        kakao.maps.event.addListener(marker, 'mouseover', function () { openInfo(shelter); });
+        kakao.maps.event.addListener(marker, 'mouseout', function () { infowindow.close(); });
+        kakao.maps.event.addListener(marker, 'click', function () { openInfo(shelter); });
+      });
 
-                    // ② 위도, 경도 문자열을 숫자로 변환
-                    var lat = parseFloat(item["위도(EPSG4326)"]);
-                    var lng = parseFloat(item["경도(EPSG4326)"]);
-                    
-                    // ③ 마커가 찍힐 좌표 객체 생성
-                    var markerPosition = new kakao.maps.LatLng(lat, lng);
+      findBtn.disabled = false;
+      findBtn.textContent = '내 위치에서 가까운 대피소 찾기';
+      setStatus('대피소 ' + shelters.length + '곳을 표시했습니다.');
+    })
+    .catch(function (error) {
+      console.error('데이터 로드 실패:', error);
+      findBtn.textContent = '대피소를 불러오지 못했습니다';
+      setStatus('places.json을 읽을 수 없습니다. 파일을 웹 서버로 열었는지 확인하세요.', true);
+    });
 
-                    // ④ 마커 이미지 설정 (대소문자 및 파일명 주의)
-                    var imageSrc = 'image.png'; 
-                    var imageSize = new kakao.maps.Size(35, 35); 
-                    var markerImage = new kakao.maps.MarkerImage(imageSrc, imageSize);
+  // 3. 현재 위치에서 가장 가까운 대피소 찾기
+  findBtn.addEventListener('click', function () {
+    if (!navigator.geolocation) {
+      setStatus('이 브라우저는 위치 기능을 지원하지 않습니다.', true);
+      return;
+    }
 
-                    // ⑤ 좌표와 이미지가 모두 준비된 상태에서 마커 생성
-                    var marker = new kakao.maps.Marker({
-                        position: markerPosition,
-                        image: markerImage, 
-                        map: map
-                    });
+    findBtn.disabled = true;
+    findBtn.textContent = '현재 위치를 확인하는 중…';
+    setStatus('위치 권한을 허용해 주세요.');
 
-                    // ⑥ 말풍선(인포윈도우) 내용 구성
-                    var iwContent = `
-                        <div style="padding:10px; color:#333; font-size:12px; min-width:150px;">
-                            <strong>${item["시설명"]}</strong><br>
-                            <span style="color:gray;">상태: ${item["운영상태"]}</span><br>
-                            <span style="font-size:11px; color:#666;">${item["도로명전체주소"]}</span>
-                        </div>`;
-                    
-                    var infowindow = new kakao.maps.InfoWindow({
-                        content: iwContent
-                    });
+    navigator.geolocation.getCurrentPosition(onLocated, onLocateFail, {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    });
+  });
 
-                    // ⑦ 마우스 이벤트 등록 (올리면 열리고, 떼면 닫힘)
-                    kakao.maps.event.addListener(marker, 'mouseover', function() {
-                        infowindow.open(map, marker);
-                    });
+  function onLocated(pos) {
+    var myLat = pos.coords.latitude;
+    var myLng = pos.coords.longitude;
+    var myPosition = new kakao.maps.LatLng(myLat, myLng);
 
-                    kakao.maps.event.addListener(marker, 'mouseout', function() {
-                        infowindow.close();
-                    });
-                });
-            })
-            .catch(error => console.error('데이터 로드 실패:', error));
-    </script>
+    resetButton();
+
+    if (!shelters.length) {
+      setStatus('표시할 대피소가 없습니다.', true);
+      return;
+    }
+
+    // 현재 위치 표시 (기본 마커 + 정확도 원)
+    if (myMarker) myMarker.setMap(null);
+    if (myAccuracy) myAccuracy.setMap(null);
+
+    myMarker = new kakao.maps.Marker({ position: myPosition, map: map, zIndex: 2 });
+    myAccuracy = new kakao.maps.Circle({
+      center: myPosition,
+      radius: Math.max(pos.coords.accuracy || 0, 20),
+      strokeWeight: 1,
+      strokeColor: '#0f1d3a',
+      strokeOpacity: 0.5,
+      fillColor: '#0f1d3a',
+      fillOpacity: 0.08,
+      map: map
+    });
+
+    // 거리 계산 후 정렬
+    var ranked = shelters.map(function (s) {
+      return { shelter: s, distance: distanceInMeters(myLat, myLng, s.lat, s.lng) };
+    }).sort(function (a, b) { return a.distance - b.distance; });
+
+    var top = ranked.slice(0, 3);
+    var nearest = top[0];
+
+    renderList(top);
+
+    // 현재 위치 → 가장 가까운 대피소 직선
+    if (routeLine) routeLine.setMap(null);
+    routeLine = new kakao.maps.Polyline({
+      path: [myPosition, nearest.shelter.position],
+      strokeWeight: 4,
+      strokeColor: '#0f1d3a',
+      strokeOpacity: 0.7,
+      strokeStyle: 'shortdash',
+      map: map
+    });
+
+    // 내 위치와 가장 가까운 대피소가 함께 보이도록 지도 이동
+    var bounds = new kakao.maps.LatLngBounds();
+    bounds.extend(myPosition);
+    bounds.extend(nearest.shelter.position);
+    map.setBounds(bounds, 80, 80, 80, 80);
+
+    openInfo(nearest.shelter, nearest.distance);
+    setStatus('가장 가까운 곳은 ' + formatDistance(nearest.distance) + ' 거리입니다. (직선거리 기준)');
+  }
+
+  function onLocateFail(err) {
+    resetButton();
+    var message;
+    if (err.code === 1) {
+      message = '위치 권한이 거부되었습니다. 브라우저 주소창의 자물쇠 아이콘에서 권한을 허용해 주세요.';
+    } else if (err.code === 2) {
+      message = '위치를 확인할 수 없습니다. 실내라면 창가나 실외에서 다시 시도해 보세요.';
+    } else if (err.code === 3) {
+      message = '위치 확인이 시간 내에 끝나지 않았습니다. 다시 시도해 주세요.';
+    } else {
+      message = '위치를 가져오지 못했습니다.';
+    }
+    if (location.protocol !== 'https:' && location.hostname !== 'localhost') {
+      message += ' 위치 기능은 https 주소에서만 동작합니다.';
+    }
+    setStatus(message, true);
+  }
+
+  // 4. 결과 목록 그리기
+  function renderList(items) {
+    resultEl.innerHTML = '';
+    items.forEach(function (entry, index) {
+      var li = document.createElement('li');
+      var button = document.createElement('button');
+      button.type = 'button';
+
+      var rank = document.createElement('span');
+      rank.className = 'rank';
+      rank.textContent = String(index + 1);
+
+      var body = document.createElement('span');
+      body.className = 'body';
+
+      var name = document.createElement('span');
+      name.className = 'name';
+      name.textContent = entry.shelter.name;
+
+      var addr = document.createElement('span');
+      addr.className = 'addr';
+      addr.textContent = entry.shelter.addr;
+
+      var dist = document.createElement('span');
+      dist.className = 'dist';
+      dist.textContent = formatDistance(entry.distance);
+
+      body.appendChild(name);
+      if (entry.shelter.addr) body.appendChild(addr);
+      button.appendChild(rank);
+      button.appendChild(body);
+      button.appendChild(dist);
+
+      button.addEventListener('click', function () {
+        map.setLevel(3);
+        map.panTo(entry.shelter.position);
+        openInfo(entry.shelter, entry.distance);
+      });
+
+      li.appendChild(button);
+      resultEl.appendChild(li);
+    });
+  }
+
+  // 5. 유틸리티
+  function openInfo(shelter, distance) {
+    var away = (typeof distance === 'number')
+      ? '<div class="away">여기서 ' + formatDistance(distance) + '</div>'
+      : '';
+    infowindow.setContent(
+      '<div class="iw">' +
+        '<strong>' + escapeHtml(shelter.name) + '</strong><br>' +
+        '<span class="meta">상태: ' + escapeHtml(shelter.status) + '</span><br>' +
+        '<span class="meta">' + escapeHtml(shelter.addr) + '</span>' +
+        away +
+      '</div>'
+    );
+    infowindow.open(map, shelter.marker);
+  }
+
+  // 하버사인 공식 (지구 반지름 6371km 기준 직선거리)
+  function distanceInMeters(lat1, lng1, lat2, lng2) {
+    var toRad = function (deg) { return deg * Math.PI / 180; };
+    var R = 6371000;
+    var dLat = toRad(lat2 - lat1);
+    var dLng = toRad(lng2 - lng1);
+    var a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+            Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+            Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
+  function formatDistance(m) {
+    return m < 1000 ? Math.round(m) + 'm' : (m / 1000).toFixed(1) + 'km';
+  }
+
+  function setStatus(text, isError) {
+    statusEl.textContent = text;
+    statusEl.className = isError ? 'is-error' : '';
+  }
+
+  function resetButton() {
+    findBtn.disabled = false;
+    findBtn.textContent = '내 위치에서 가까운 대피소 찾기';
+  }
+
+  function escapeHtml(text) {
+    return String(text == null ? '' : text).replace(/[&<>"']/g, function (ch) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch];
+    });
+  }
+  </script>
 </body>
 </html>
